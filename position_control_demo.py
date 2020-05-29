@@ -20,21 +20,23 @@ class OffbPosCtl:
 
     des_pose = PoseStamped()
     isReadyToFly = False
-    # location
+    # locations = numpy.matrix([[0, 0, 2, 0, 0, 0],
+    #                           [8, 8, 2, 0, 0, 0],
+    #                           [0, 0, 2, 0, 0, 0]
+    #                           ])
+
     locations = numpy.matrix([[2, 0, 1, 0, 0, -0.48717451, -0.87330464],
-                              [84.7, -54.4, 20.89, 0, 0, 1, -0.87330464],
-                              [-76, 425, 60, 0, 0, 0, 1],
-                              [-76, 425, 1, 0, 0, 0, 1],
-                              [0, 0, 0, 0, 0, 0, 0]
+                              [0, 2, 1, 0, 0, 0, 1],
+                              [-2, 0, 1, 0.,  0.,  0.99902148, -0.04422762],
+                              [0, -2, 1, 0, 0, 0, 0],
                               ])
 
 
     def __init__(self):
         rospy.init_node('offboard_test', anonymous=True)
-        pose_pub = rospy.Publisher('/uav1/mavros/setpoint_position/local', PoseStamped, queue_size=10)
-        drone_pose_subscriber = rospy.Subscriber('/uav1/mavros/local_position/pose', PoseStamped, callback=self.mocap_cb)
-        rover_pose_subscriber = rospy.Subscriber('/uav0/mavros/local_position/pose', PoseStamped, callback=self.rover_cb)
-        state_sub = rospy.Subscriber('/uav1/mavros/state', State, callback=self.state_cb)
+        pose_pub = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=10)
+        mocap_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, callback=self.mocap_cb)
+        state_sub = rospy.Subscriber('/mavros/state', State, callback=self.state_cb)
 
         rate = rospy.Rate(10)  # Hz
         rate.sleep()
@@ -48,10 +50,8 @@ class OffbPosCtl:
                 self.waypointIndex = 0
                 self.sim_ctr += 1
 
-
-
-
             if self.isReadyToFly:
+
                 des_x = self.locations[self.waypointIndex, 0]
                 des_y = self.locations[self.waypointIndex, 1]
                 des_z = self.locations[self.waypointIndex, 2]
@@ -63,17 +63,6 @@ class OffbPosCtl:
                 self.des_pose.pose.orientation.z = self.locations[self.waypointIndex, 5]
                 self.des_pose.pose.orientation.w = self.locations[self.waypointIndex, 6]
 
-                if self.locations[self.waypointIndex,:].sum() == 0:
-                    des_x = self.curr_rover_pose.pose.position.x
-                    des_y = self.curr_rover_pose.pose.position.y
-                    des_z = self.curr_rover_pose.pose.position.y + 2
-                    self.des_pose.pose.position.x = des_x
-                    self.des_pose.pose.position.y = des_y
-                    self.des_pose.pose.position.z = des_z
-                    self.des_pose.pose.orientation.x = 0
-                    self.des_pose.pose.orientation.y = 0
-                    self.des_pose.pose.orientation.z = 0
-                    self.des_pose.pose.orientation.w = 0
 
                 curr_x = self.curr_pose.pose.position.x
                 curr_y = self.curr_pose.pose.position.y
@@ -83,6 +72,7 @@ class OffbPosCtl:
                 if dist < self.distThreshold:
                     self.waypointIndex += 1
 
+                # print dist, curr_x, curr_y, curr_z, self.waypointIndex
             pose_pub.publish(self.des_pose)
             rate.sleep()
 
@@ -96,10 +86,8 @@ class OffbPosCtl:
         return copied_pose
 
     def mocap_cb(self, msg):
+        # print msg
         self.curr_pose = msg
-
-    def rover_cb(self, msg):
-        self.curr_rover_pose = msg
 
     def state_cb(self,msg):
         print msg.mode
