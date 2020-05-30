@@ -7,26 +7,26 @@ from mavros_msgs.msg import State
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 import math
 import numpy
-from std_msgs.msg import String
+
 
 class OffbPosCtl:
     curr_pose = PoseStamped()
     waypointIndex = 0
-    distThreshold = 0.6
+    distThreshold = 0.4
     sim_ctr = 1
 
     des_pose = PoseStamped()
     isReadyToFly = False
     # location
     locations = numpy.matrix([[2, 0, 1, 0, 0, -0.48717451, -0.87330464],
-                              [83.73, -54.411, 20.89, 0, 0, 1, -0.87330464],
-                              [83.73, -54.411, 17.9, 0, 0, 1, -0.87330464],
-                              [83.73, -54.411, 30.89, 0, 0, 1, -0.87330464],
+                              [84.73, -54.411, 20.89, 0, 0, 1, -0.87330464],
+                              [84.73, -54.411, 17.89, 0, 0, 1, -0.87330464],
 
                               [-76, 425, 60, 0, 0, 0, 1],
                               [-76, 425, 1, 0, 0, 0, 1],
                               [0, 0, 0, 0, 0, 0, 0]
                               ])
+
 
     def __init__(self):
         rospy.init_node('offboard_test', anonymous=True)
@@ -34,7 +34,6 @@ class OffbPosCtl:
         drone_pose_subscriber = rospy.Subscriber('/uav1/mavros/local_position/pose', PoseStamped, callback=self.drone_pose_cb)
         rover_pose_subscriber = rospy.Subscriber('/uav0/mavros/local_position/pose', PoseStamped, callback=self.rover_pose_cb)
         state_sub = rospy.Subscriber('/uav1/mavros/state', State, callback=self.drone_state_cb)
-        attach = rospy.Publisher('/attach', String, queue_size=10)
 
         rate = rospy.Rate(10)  # Hz
         rate.sleep()
@@ -48,14 +47,6 @@ class OffbPosCtl:
                 self.waypointIndex = 0
                 self.sim_ctr += 1
 
-            if self.waypointIndex == 2:
-                attach.publish("ATTACH")
-
-            if self.waypointIndex == 3:
-                attach.publish("ATTACH")
-
-            if self.waypointIndex == 6:
-                attach.publish("DETACH")
 
             if self.isReadyToFly:
                 [des_x, des_y, des_z] = self.set_desired_pose()
