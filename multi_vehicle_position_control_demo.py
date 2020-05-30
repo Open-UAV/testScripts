@@ -7,40 +7,42 @@ from mavros_msgs.msg import State
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 import math
 import numpy
-from std_msgs.msg import String, Header
-
+from std_msgs.msg import String
+from tf.transformations import quaternion_from_euler
 
 class OffbPosCtl:
-    curr_pose = PoseStamped()
+    curr_drone_pose = PoseStamped()
     waypointIndex = 0
-    distThreshold = 0.4
+    distThreshold = 0.5
     sim_ctr = 1
 
     des_pose = PoseStamped()
     isReadyToFly = False
     # location
-    locations = numpy.matrix([[2, 0, 1, 0, 0, -0.48717451, -0.87330464],
-                              [84.73, -54.411, 20.89, 0, 0, 1, -0.87330464],
-                              [84.73, -54.411, 17.89, 0, 0, 1, -0.87330464],
+    orientation = quaternion_from_euler(0,0, 3.14/2+3.14/8)
+    locations = numpy.matrix([[2, 0, 1, orientation[0],orientation[1],orientation[2],orientation[3]],
+                              [83.23, -54.411, 20.89, orientation[0],orientation[1],orientation[2],orientation[3]],
+                              [83.23, -54.411, 17.89, orientation[0],orientation[1],orientation[2],orientation[3]],
+                              [83.23, -54.411, 27.89, orientation[0], orientation[1], orientation[2], orientation[3]],
 
-                              [-76, 425, 60, 0, 0, 0, 1],
-                              [-76, 425, 1, 0, 0, 0, 1],
+                              [-76, 425, 60, orientation[0],orientation[1],orientation[2],orientation[3]],
+                              [-76, 425, 1, orientation[0],orientation[1],orientation[2],orientation[3]],
                               [0, 0, 0, 0, 0, 0, 0]
                               ])
-
 
     def __init__(self):
         rospy.init_node('offboard_test', anonymous=True)
         pose_pub = rospy.Publisher('/uav1/mavros/setpoint_position/local', PoseStamped, queue_size=10)
-        drone_pose_subscriber = rospy.Subscriber('/uav1/mavros/local_position/pose', PoseStamped, callback=self.drone_pose_cb)
-        rover_pose_subscriber = rospy.Subscriber('/uav0/mavros/local_position/pose', PoseStamped, callback=self.rover_pose_cb)
+        drone_pose_subscriber = rospy.Subscriber('/uav1/mavros/local_position/pose', PoseStamped,
+                                                 callback=self.drone_pose_cb)
+        rover_pose_subscriber = rospy.Subscriber('/uav0/mavros/local_position/pose', PoseStamped,
+                                                 callback=self.rover_pose_cb)
         state_sub = rospy.Subscriber('/uav1/mavros/state', State, callback=self.drone_state_cb)
         attach = rospy.Publisher('/attach', String, queue_size=10)
 
-
         rate = rospy.Rate(10)  # Hz
         rate.sleep()
-        self.des_pose = self.copy_pose(self.curr_pose)
+        self.des_pose = self.copy_pose(self.curr_drone_pose)
         shape = self.locations.shape
         is_attached = False
         while not rospy.is_shutdown():
@@ -50,20 +52,27 @@ class OffbPosCtl:
                 self.waypointIndex = 0
                 self.sim_ctr += 1
 
-            if not is_attached:
+            if self.waypointIndex is 2:
                 attach.publish("ATTACH")
-                is_attached = True
-                rospy.sleep(0.2)
+                attach.publish("ATTACH")
 
-            if self.waypointIndex == 6:
-                attach.publish("DETACH")
+
+            # if self.waypointIndex == 6:
+            #     attach.publish("DETACH")
 
             if self.isReadyToFly:
                 [des_x, des_y, des_z] = self.set_desired_pose()
-                curr_x = self.curr_pose.pose.position.x
-                curr_y = self.curr_pose.pose.position.y
-                curr_z = self.curr_pose.pose.position.z
-                dist = math.sqrt((curr_x - des_x)*(curr_x - des_x) + (curr_y - des_y)*(curr_y - des_y) + (curr_z - des_z)*(curr_z - des_z))
+                # azimuth = math.atan2(self.curr_rover_pose.pose.position.y - self.curr_drone_pose.pose.position.y,
+                #                      self.curr_rover_pose.pose.position.x - self.curr_drone_pose.pose.position.x)
+                # quaternion = quaternion_from_euler(0, 0, azimuth)
+
+                curr_x = self.curr_drone_pose.pose.position.x
+                curr_y = self.curr_drone_pose.pose.position.y
+                curr_z = self.curr_drone_pose.pose.position.z
+
+                dist = math.sqrt(
+                    (curr_x - des_x) * (curr_x - des_x) + (curr_y - des_y) * (curr_y - des_y) + (curr_z - des_z) * (
+                                curr_z - des_z))
                 if dist < self.distThreshold:
                     self.waypointIndex += 1
 
@@ -94,16 +103,17 @@ class OffbPosCtl:
         return copied_pose
 
     def drone_pose_cb(self, msg):
-        self.curr_pose = msg
+        self.curr_drone_pose = msg
 
     def rover_pose_cb(self, msg):
         self.curr_rover_pose = msg
 
-    def drone_state_cb(self,msg):
+    def drone_state_cb(self, msg):
         print msg.mode
-        if(msg.mode=='OFFBOARD'):
+        if (msg.mode == 'OFFBOARD'):
             self.isReadyToFly = True
             print "readyToFly"
+
 
 if __name__ == "__main__":
     OffbPosCtl()
